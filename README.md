@@ -71,6 +71,45 @@ Todos os agentes herdam o modelo da sessão em que o workflow foi chamado. O que
 
 Uma spec de umas 5 unidades gasta entre 15 e 25 agentes. Para specs grandes, use `escopo` para fatiar em execuções menores. O Claude Code avisa quando um run projeta mais de 25 agentes ou 1,5M de tokens.
 
+## Versão curta: `implementar-spec-curto`
+
+O repositório traz duas versões, lado a lado. A completa (`implementar-spec`) é a descrita acima. A curta (`workflows/implementar-spec-curto.js`) faz o mesmo percurso com **4 a 6 agentes** em vez de 15 a 25, para quando o custo e o tempo da completa não compensam.
+
+Ela nasceu de uma medição em projeto real: nas primeiras 7 issues, a versão completa usou 411 agentes. A maior parte do tempo ia para revisões por unidade que se sobrepunham ao aceite final, e a suíte inteira rodava várias vezes na mesma issue.
+
+O que muda:
+
+| | Completa | Curta |
+|---|---|---|
+| Plano | planejador, crítico e replanejamento | só o planejador, com no máximo 2 fatias |
+| Implementação | um agente por unidade, em ondas | 1 ou 2 agentes, e cada um confere uma lista de pontos sensíveis antes de entregar |
+| Revisão | um revisor por unidade, com até 2 rodadas de correção | um único revisor independente no fim, contra a spec e a mesma lista |
+| Faltas do aceite | uma unidade complementar por falta, depois novo aceite | um único corretor para todas as faltas, sem segundo aceite |
+| Testes | suíte inteira ao fim de cada onda | lint e testes dos arquivos tocados; suíte inteira no merge, ou no integrador com `suiteCompleta` |
+| Commit e Linear | agentes próprios | feitos pelo integrador, pelo revisor ou pelo corretor, sem agente extra |
+
+O que não muda: ninguém revisa o próprio trabalho, e o resultado é confrontado com a spec original requisito por requisito.
+
+Instalação, igual à da completa:
+
+```bash
+mkdir -p ~/.claude/workflows && curl -fsSL https://raw.githubusercontent.com/iagodemacedo/workflow-implementar/main/workflows/implementar-spec-curto.js -o ~/.claude/workflows/implementar-spec-curto.js
+```
+
+Uso: `/implementar-spec-curto MAR-12`. Opções, em linguagem natural na mesma mensagem:
+
+| Opção | O que faz | Padrão |
+|---|---|---|
+| `listaSensivel` | Os pontos que o implementador confere e o revisor reconfere. Troque pelas regras que não podem quebrar no seu projeto | segredos, validação e autorização, edge cases sem teste, regressão e escopo |
+| `suiteCompleta` | O integrador roda a suíte inteira, em vez de só os testes dos arquivos tocados | false |
+| `raiz` | Caminho de um git worktree, para rodar várias issues em paralelo sem misturar os diffs | o repositório atual |
+| `base` | Branch contra a qual o revisor lê o diff | main |
+| `reportarNoLinear` | Publica o relatório como comentário na issue | true |
+
+A curta sempre faz commit, porque o revisor lê o diff commitado contra a `base`. Com `suiteCompleta` desligada, rode a suíte inteira antes do merge (no CI ou à mão): é a prova que o workflow deixa para depois.
+
+A versão curta é nova e ainda está sendo medida. Os números de tempo e custo entram aqui quando houver issues suficientes rodadas com ela.
+
 ## Para quem escreve specs
 
 O workflow rende mais quando a spec já vem escrita para ser executada por agentes: contexto, regras exatas, edge cases e critérios de aceite verificáveis. Issues assim reduzem as perguntas em aberto do planejador e as rodadas de revisão. Uma spec vaga não quebra o workflow, mas o aceite final vai devolver mais itens como "implementado com interpretação conservadora, validar com humano".
